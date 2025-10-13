@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import StatCard from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
@@ -16,16 +17,20 @@ import {
   MapPin,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
 
 const TrackActivity = () => {
   const { sport } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+  
   const [isTracking, setIsTracking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
+  const [startTime, setStartTime] = useState<Date | null>(null);
 
-  // Mock real-time stats
   const [stats, setStats] = useState({
     currentSpeed: 0,
     avgSpeed: 0,
@@ -33,22 +38,35 @@ const TrackActivity = () => {
     elevation: 0,
     maxSpeed: 0,
     altitude: 2340,
+    minAltitude: 2340,
+    maxAltitude: 2340,
   });
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isTracking && !isPaused) {
       interval = setInterval(() => {
         setDuration((d) => d + 1);
-        // Simulate changing stats
-        setStats((s) => ({
-          currentSpeed: Math.random() * 60 + 20,
-          avgSpeed: s.avgSpeed + Math.random() * 0.5,
-          distance: s.distance + 0.01,
-          elevation: s.elevation + Math.random() * 2,
-          maxSpeed: Math.max(s.maxSpeed, s.currentSpeed),
-          altitude: s.altitude + (Math.random() - 0.5) * 5,
-        }));
+        setStats((s) => {
+          const newSpeed = Math.random() * 60 + 20;
+          const newAltitude = s.altitude + (Math.random() - 0.5) * 5;
+          return {
+            currentSpeed: newSpeed,
+            avgSpeed: s.avgSpeed + Math.random() * 0.5,
+            distance: s.distance + 0.01,
+            elevation: s.elevation + Math.random() * 2,
+            maxSpeed: Math.max(s.maxSpeed, newSpeed),
+            altitude: newAltitude,
+            minAltitude: Math.min(s.minAltitude, newAltitude),
+            maxAltitude: Math.max(s.maxAltitude, newAltitude),
+          };
+        });
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -57,6 +75,7 @@ const TrackActivity = () => {
   const handleStart = () => {
     setIsTracking(true);
     setIsPaused(false);
+    setStartTime(new Date());
     toast({
       title: "Tracking Started",
       description: "Recording your activity...",
@@ -71,13 +90,48 @@ const TrackActivity = () => {
     });
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
+    if (!user || !startTime || !sport) return;
+
+    const endTime = new Date();
+    
+    const { data: activity, error: activityError } = await supabase
+      .from("activities")
+      .insert({
+        user_id: user.id,
+        sport_type: sport as Database["public"]["Enums"]["sport_type"],
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        total_distance_m: stats.distance * 1000,
+        total_time_s: duration,
+        moving_time_s: duration,
+        average_speed_mps: (stats.avgSpeed / 3.6),
+        max_speed_mps: (stats.maxSpeed / 3.6),
+        elevation_gain_m: stats.elevation,
+        elevation_loss_m: 0,
+        vertical_drop_m: stats.maxAltitude - stats.minAltitude,
+        min_altitude_m: stats.minAltitude,
+        max_altitude_m: stats.maxAltitude,
+      })
+      .select()
+      .single();
+
+    if (activityError) {
+      toast({
+        title: "Error saving activity",
+        description: activityError.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsTracking(false);
     setIsPaused(false);
     toast({
       title: "Activity Saved",
       description: "Your session has been recorded!",
     });
+    
     setTimeout(() => navigate("/activities"), 1500);
   };
 
@@ -104,7 +158,6 @@ const TrackActivity = () => {
 
       <main className="container mx-auto px-4 pt-24 pb-12">
         <div className="max-w-4xl mx-auto space-y-6">
-          {/* Header */}
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold">{getSportName()}</h1>
             <p className="text-muted-foreground">
@@ -112,7 +165,6 @@ const TrackActivity = () => {
             </p>
           </div>
 
-          {/* Map Placeholder */}
           <Card className="overflow-hidden">
             <div className="h-64 bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 flex items-center justify-center">
               <div className="text-center space-y-2">
@@ -123,7 +175,6 @@ const TrackActivity = () => {
             </div>
           </Card>
 
-          {/* Timer Display */}
           <Card className="gradient-stat border-none">
             <div className="p-8 text-center">
               <p className="text-sm text-muted-foreground mb-2">DURATION</p>
@@ -131,7 +182,6 @@ const TrackActivity = () => {
             </div>
           </Card>
 
-          {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <StatCard
               icon={Gauge}
@@ -173,7 +223,6 @@ const TrackActivity = () => {
             />
           </div>
 
-          {/* Control Buttons */}
           <div className="flex gap-4 justify-center">
             {!isTracking ? (
               <Button variant="hero" size="xl" onClick={handleStart}>
