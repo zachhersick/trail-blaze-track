@@ -14,7 +14,135 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activities: {
+        Row: {
+          average_speed_mps: number
+          created_at: string
+          elevation_gain_m: number
+          elevation_loss_m: number
+          end_time: string
+          id: string
+          max_altitude_m: number | null
+          max_speed_mps: number
+          min_altitude_m: number | null
+          moving_time_s: number
+          sport_type: Database["public"]["Enums"]["sport_type"]
+          start_time: string
+          total_distance_m: number
+          total_time_s: number
+          user_id: string
+          vertical_drop_m: number
+        }
+        Insert: {
+          average_speed_mps?: number
+          created_at?: string
+          elevation_gain_m?: number
+          elevation_loss_m?: number
+          end_time: string
+          id?: string
+          max_altitude_m?: number | null
+          max_speed_mps?: number
+          min_altitude_m?: number | null
+          moving_time_s?: number
+          sport_type: Database["public"]["Enums"]["sport_type"]
+          start_time: string
+          total_distance_m?: number
+          total_time_s?: number
+          user_id: string
+          vertical_drop_m?: number
+        }
+        Update: {
+          average_speed_mps?: number
+          created_at?: string
+          elevation_gain_m?: number
+          elevation_loss_m?: number
+          end_time?: string
+          id?: string
+          max_altitude_m?: number | null
+          max_speed_mps?: number
+          min_altitude_m?: number | null
+          moving_time_s?: number
+          sport_type?: Database["public"]["Enums"]["sport_type"]
+          start_time?: string
+          total_distance_m?: number
+          total_time_s?: number
+          user_id?: string
+          vertical_drop_m?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          default_sport: Database["public"]["Enums"]["sport_type"] | null
+          display_name: string | null
+          id: string
+          unit_preference: Database["public"]["Enums"]["unit_preference"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_sport?: Database["public"]["Enums"]["sport_type"] | null
+          display_name?: string | null
+          id: string
+          unit_preference?:
+            | Database["public"]["Enums"]["unit_preference"]
+            | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_sport?: Database["public"]["Enums"]["sport_type"] | null
+          display_name?: string | null
+          id?: string
+          unit_preference?:
+            | Database["public"]["Enums"]["unit_preference"]
+            | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      trackpoints: {
+        Row: {
+          activity_id: string
+          altitude_m: number | null
+          created_at: string
+          id: string
+          latitude: number
+          longitude: number
+          recorded_at: string
+          speed_mps: number | null
+        }
+        Insert: {
+          activity_id: string
+          altitude_m?: number | null
+          created_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          recorded_at: string
+          speed_mps?: number | null
+        }
+        Update: {
+          activity_id?: string
+          altitude_m?: number | null
+          created_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          recorded_at?: string
+          speed_mps?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trackpoints_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +151,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      sport_type: "ski" | "bike" | "offroad" | "hike"
+      unit_preference: "metric" | "imperial"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +279,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      sport_type: ["ski", "bike", "offroad", "hike"],
+      unit_preference: ["metric", "imperial"],
+    },
   },
 } as const
