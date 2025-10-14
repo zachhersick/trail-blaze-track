@@ -10,6 +10,8 @@ import TrackActivity from "./pages/TrackActivity";
 import Activities from "./pages/Activities";
 import ActivityDetail from "./pages/ActivityDetail";
 import Profile from "./pages/Profile";
+import Friends from "./pages/Friends";
+import FriendProfile from "./pages/FriendProfile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -29,6 +31,8 @@ const App = () => (
             <Route path="/activities" element={<Activities />} />
             <Route path="/activity/:id" element={<ActivityDetail />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/friends" element={<Friends />} />
+            <Route path="/friend/:id" element={<FriendProfile />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/about" element={<Index />} />
             <Route path="*" element={<NotFound />} />
