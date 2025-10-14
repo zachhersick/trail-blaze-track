@@ -1,10 +1,19 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import SportCard from "@/components/SportCard";
 import { Bike, Mountain, Truck, Footprints } from "lucide-react";
 
 const SelectSport = () => {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
 
   const sports = [
     {

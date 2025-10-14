@@ -29,11 +29,8 @@ const Navbar = () => {
           <Link to="/activities" className="text-sm font-medium hover:text-primary transition-smooth">
             Activities
           </Link>
-          <Link to="/track" className="text-sm font-medium hover:text-primary transition-smooth">
+          <Link to="/select-sport" className="text-sm font-medium hover:text-primary transition-smooth">
             Track
-          </Link>
-          <Link to="/about" className="text-sm font-medium hover:text-primary transition-smooth">
-            About
           </Link>
         </div>
 
