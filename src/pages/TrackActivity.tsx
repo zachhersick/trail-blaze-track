@@ -37,10 +37,15 @@ const TrackActivity = () => {
     distance: 0,
     elevation: 0,
     maxSpeed: 0,
-    altitude: 2340,
-    minAltitude: 2340,
-    maxAltitude: 2340,
+    altitude: 0,
+    minAltitude: 0,
+    maxAltitude: 0,
   });
+
+  const [lastPosition, setLastPosition] = useState<GeolocationPosition | null>(null);
+  const [activityId, setActivityId] = useState<string | null>(null);
+  const [watchId, setWatchId] = useState<number | null>(null);
+  const [totalSpeeds, setTotalSpeeds] = useState<number[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -48,37 +53,164 @@ const TrackActivity = () => {
     }
   }, [user, authLoading, navigate]);
 
+  // Timer for duration
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isTracking && !isPaused) {
       interval = setInterval(() => {
         setDuration((d) => d + 1);
-        setStats((s) => {
-          const newSpeed = Math.random() * 60 + 20;
-          const newAltitude = s.altitude + (Math.random() - 0.5) * 5;
-          return {
-            currentSpeed: newSpeed,
-            avgSpeed: s.avgSpeed + Math.random() * 0.5,
-            distance: s.distance + 0.01,
-            elevation: s.elevation + Math.random() * 2,
-            maxSpeed: Math.max(s.maxSpeed, newSpeed),
-            altitude: newAltitude,
-            minAltitude: Math.min(s.minAltitude, newAltitude),
-            maxAltitude: Math.max(s.maxAltitude, newAltitude),
-          };
-        });
       }, 1000);
     }
     return () => clearInterval(interval);
   }, [isTracking, isPaused]);
 
-  const handleStart = () => {
+  // Calculate distance between two GPS points using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // GPS tracking
+  useEffect(() => {
+    if (isTracking && !isPaused) {
+      if (!navigator.geolocation) {
+        toast({
+          title: "GPS not available",
+          description: "Your device doesn't support GPS tracking",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const id = navigator.geolocation.watchPosition(
+        async (position) => {
+          const { latitude, longitude, altitude, speed } = position.coords;
+          const currentAltitude = altitude || 0;
+          const currentSpeed = speed ? speed * 3.6 : 0; // Convert m/s to km/h
+
+          if (lastPosition) {
+            // Calculate distance from last position
+            const distanceMeters = calculateDistance(
+              lastPosition.coords.latitude,
+              lastPosition.coords.longitude,
+              latitude,
+              longitude
+            );
+            const distanceKm = distanceMeters / 1000;
+
+            // Calculate elevation change
+            const elevationChange = currentAltitude - lastPosition.coords.altitude!;
+
+            setStats((s) => {
+              const newSpeeds = [...totalSpeeds, currentSpeed];
+              setTotalSpeeds(newSpeeds);
+              const avgSpeed = newSpeeds.reduce((a, b) => a + b, 0) / newSpeeds.length;
+
+              return {
+                currentSpeed,
+                avgSpeed,
+                distance: s.distance + distanceKm,
+                elevation: elevationChange > 0 ? s.elevation + elevationChange : s.elevation,
+                maxSpeed: Math.max(s.maxSpeed, currentSpeed),
+                altitude: currentAltitude,
+                minAltitude: s.minAltitude === 0 ? currentAltitude : Math.min(s.minAltitude, currentAltitude),
+                maxAltitude: Math.max(s.maxAltitude, currentAltitude),
+              };
+            });
+
+            // Save trackpoint to database
+            if (activityId) {
+              await supabase.from("trackpoints").insert({
+                activity_id: activityId,
+                recorded_at: new Date().toISOString(),
+                latitude,
+                longitude,
+                altitude_m: currentAltitude,
+                speed_mps: speed || 0,
+              });
+            }
+          } else {
+            // First position - initialize altitude values
+            setStats((s) => ({
+              ...s,
+              altitude: currentAltitude,
+              minAltitude: currentAltitude,
+              maxAltitude: currentAltitude,
+            }));
+          }
+
+          setLastPosition(position);
+        },
+        (error) => {
+          toast({
+            title: "GPS Error",
+            description: error.message,
+            variant: "destructive",
+          });
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 5000,
+        }
+      );
+
+      setWatchId(id);
+
+      return () => {
+        if (id) navigator.geolocation.clearWatch(id);
+      };
+    }
+  }, [isTracking, isPaused, lastPosition, activityId, totalSpeeds]);
+
+  const handleStart = async () => {
+    if (!user || !sport) return;
+
+    // Create activity in database first
+    const { data: activity, error: activityError } = await supabase
+      .from("activities")
+      .insert({
+        user_id: user.id,
+        sport_type: sport as Database["public"]["Enums"]["sport_type"],
+        start_time: new Date().toISOString(),
+        end_time: new Date().toISOString(), // Will be updated on stop
+        total_distance_m: 0,
+        total_time_s: 0,
+        moving_time_s: 0,
+        average_speed_mps: 0,
+        max_speed_mps: 0,
+        elevation_gain_m: 0,
+        elevation_loss_m: 0,
+        vertical_drop_m: 0,
+        min_altitude_m: 0,
+        max_altitude_m: 0,
+      })
+      .select()
+      .single();
+
+    if (activityError || !activity) {
+      toast({
+        title: "Error starting activity",
+        description: activityError?.message || "Failed to create activity",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setActivityId(activity.id);
     setIsTracking(true);
     setIsPaused(false);
     setStartTime(new Date());
     toast({
       title: "Tracking Started",
-      description: "Recording your activity...",
+      description: "Using GPS to track your activity...",
     });
   };
 
@@ -91,35 +223,38 @@ const TrackActivity = () => {
   };
 
   const handleStop = async () => {
-    if (!user || !startTime || !sport) return;
+    if (!activityId || !startTime) return;
+
+    // Stop GPS tracking
+    if (watchId) {
+      navigator.geolocation.clearWatch(watchId);
+      setWatchId(null);
+    }
 
     const endTime = new Date();
     
-    const { data: activity, error: activityError } = await supabase
+    // Update activity with final stats
+    const { error: updateError } = await supabase
       .from("activities")
-      .insert({
-        user_id: user.id,
-        sport_type: sport as Database["public"]["Enums"]["sport_type"],
-        start_time: startTime.toISOString(),
+      .update({
         end_time: endTime.toISOString(),
         total_distance_m: stats.distance * 1000,
         total_time_s: duration,
         moving_time_s: duration,
-        average_speed_mps: (stats.avgSpeed / 3.6),
-        max_speed_mps: (stats.maxSpeed / 3.6),
+        average_speed_mps: stats.avgSpeed / 3.6,
+        max_speed_mps: stats.maxSpeed / 3.6,
         elevation_gain_m: stats.elevation,
         elevation_loss_m: 0,
         vertical_drop_m: stats.maxAltitude - stats.minAltitude,
         min_altitude_m: stats.minAltitude,
         max_altitude_m: stats.maxAltitude,
       })
-      .select()
-      .single();
+      .eq('id', activityId);
 
-    if (activityError) {
+    if (updateError) {
       toast({
         title: "Error saving activity",
-        description: activityError.message,
+        description: updateError.message,
         variant: "destructive",
       });
       return;
@@ -129,7 +264,7 @@ const TrackActivity = () => {
     setIsPaused(false);
     toast({
       title: "Activity Saved",
-      description: "Your session has been recorded!",
+      description: "Your GPS-tracked session has been recorded!",
     });
     
     setTimeout(() => navigate("/activities"), 1500);
