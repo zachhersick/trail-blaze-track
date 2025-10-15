@@ -46,6 +46,7 @@ const TrackActivity = () => {
   const [activityId, setActivityId] = useState<string | null>(null);
   const [watchId, setWatchId] = useState<number | null>(null);
   const [totalSpeeds, setTotalSpeeds] = useState<number[]>([]);
+  const [locationPermission, setLocationPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -91,9 +92,15 @@ const TrackActivity = () => {
 
       const id = navigator.geolocation.watchPosition(
         async (position) => {
-          const { latitude, longitude, altitude, speed } = position.coords;
+          const { latitude, longitude, altitude, accuracy } = position.coords;
+          
+          // Filter out low-accuracy positions (worse than 50 meters)
+          if (accuracy > 50) {
+            console.log(`Ignoring low-accuracy position: ${accuracy}m`);
+            return;
+          }
+
           const currentAltitude = altitude || 0;
-          const currentSpeed = speed ? speed * 3.6 : 0; // Convert m/s to km/h
 
           if (lastPosition) {
             // Calculate distance from last position
@@ -103,22 +110,42 @@ const TrackActivity = () => {
               latitude,
               longitude
             );
+
+            // Minimum distance threshold to filter GPS drift (5 meters)
+            if (distanceMeters < 5) {
+              // Update only altitude if position hasn't changed significantly
+              setStats((s) => ({
+                ...s,
+                altitude: currentAltitude,
+                minAltitude: Math.min(s.minAltitude || currentAltitude, currentAltitude),
+                maxAltitude: Math.max(s.maxAltitude, currentAltitude),
+                currentSpeed: 0, // No movement detected
+              }));
+              return;
+            }
+
             const distanceKm = distanceMeters / 1000;
+            
+            // Calculate speed from position change and time elapsed
+            const timeDiffSeconds = (position.timestamp - lastPosition.timestamp) / 1000;
+            const calculatedSpeedMps = distanceMeters / timeDiffSeconds;
+            const calculatedSpeedKmh = calculatedSpeedMps * 3.6;
 
             // Calculate elevation change
-            const elevationChange = currentAltitude - lastPosition.coords.altitude!;
+            const lastAltitude = lastPosition.coords.altitude || 0;
+            const elevationChange = currentAltitude - lastAltitude;
 
             setStats((s) => {
-              const newSpeeds = [...totalSpeeds, currentSpeed];
+              const newSpeeds = [...totalSpeeds, calculatedSpeedKmh];
               setTotalSpeeds(newSpeeds);
               const avgSpeed = newSpeeds.reduce((a, b) => a + b, 0) / newSpeeds.length;
 
               return {
-                currentSpeed,
+                currentSpeed: calculatedSpeedKmh,
                 avgSpeed,
                 distance: s.distance + distanceKm,
                 elevation: elevationChange > 0 ? s.elevation + elevationChange : s.elevation,
-                maxSpeed: Math.max(s.maxSpeed, currentSpeed),
+                maxSpeed: Math.max(s.maxSpeed, calculatedSpeedKmh),
                 altitude: currentAltitude,
                 minAltitude: s.minAltitude === 0 ? currentAltitude : Math.min(s.minAltitude, currentAltitude),
                 maxAltitude: Math.max(s.maxAltitude, currentAltitude),
@@ -133,7 +160,7 @@ const TrackActivity = () => {
                 latitude,
                 longitude,
                 altitude_m: currentAltitude,
-                speed_mps: speed || 0,
+                speed_mps: calculatedSpeedMps,
               });
             }
           } else {
@@ -149,16 +176,25 @@ const TrackActivity = () => {
           setLastPosition(position);
         },
         (error) => {
-          toast({
-            title: "GPS Error",
-            description: error.message,
-            variant: "destructive",
-          });
+          if (error.code === error.PERMISSION_DENIED) {
+            setLocationPermission('denied');
+            toast({
+              title: "Location Permission Denied",
+              description: "Please enable location access in your device settings to track activities.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "GPS Error",
+              description: error.message,
+              variant: "destructive",
+            });
+          }
         },
         {
           enableHighAccuracy: true,
           maximumAge: 0,
-          timeout: 5000,
+          timeout: 10000,
         }
       );
 
@@ -172,6 +208,24 @@ const TrackActivity = () => {
 
   const handleStart = async () => {
     if (!user || !sport) return;
+
+    // Request location permission
+    try {
+      const result = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+      setLocationPermission(result.state as 'prompt' | 'granted' | 'denied');
+      
+      if (result.state === 'denied') {
+        toast({
+          title: "Location Permission Required",
+          description: "Please enable location access in your device settings.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (error) {
+      // Fallback for browsers that don't support permissions query
+      console.log('Permissions API not supported, will request on geolocation call');
+    }
 
     // Create activity in database first
     const { data: activity, error: activityError } = await supabase
