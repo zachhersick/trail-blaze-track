@@ -94,8 +94,8 @@ const TrackActivity = () => {
         async (position) => {
           const { latitude, longitude, altitude, accuracy } = position.coords;
           
-          // Filter out low-accuracy positions (worse than 50 meters)
-          if (accuracy > 50) {
+          // Strict accuracy filtering - only accept GPS readings within 20 meters
+          if (accuracy > 20) {
             console.log(`Ignoring low-accuracy position: ${accuracy}m`);
             return;
           }
@@ -111,8 +111,11 @@ const TrackActivity = () => {
               longitude
             );
 
-            // Minimum distance threshold to filter GPS drift (5 meters)
-            if (distanceMeters < 5) {
+            // Calculate time difference
+            const timeDiffSeconds = (position.timestamp - lastPosition.timestamp) / 1000;
+            
+            // Require minimum 10 meters movement AND 2 seconds elapsed to register as real movement
+            if (distanceMeters < 10 || timeDiffSeconds < 2) {
               // Update only altitude if position hasn't changed significantly
               setStats((s) => ({
                 ...s,
@@ -127,9 +130,22 @@ const TrackActivity = () => {
             const distanceKm = distanceMeters / 1000;
             
             // Calculate speed from position change and time elapsed
-            const timeDiffSeconds = (position.timestamp - lastPosition.timestamp) / 1000;
             const calculatedSpeedMps = distanceMeters / timeDiffSeconds;
             const calculatedSpeedKmh = calculatedSpeedMps * 3.6;
+            
+            // Filter out unrealistic speeds (likely GPS errors)
+            // Minimum 1 km/h to register as movement, max 200 km/h to filter errors
+            if (calculatedSpeedKmh < 1 || calculatedSpeedKmh > 200) {
+              console.log(`Ignoring unrealistic speed: ${calculatedSpeedKmh.toFixed(1)} km/h`);
+              setStats((s) => ({
+                ...s,
+                currentSpeed: 0,
+                altitude: currentAltitude,
+                minAltitude: Math.min(s.minAltitude || currentAltitude, currentAltitude),
+                maxAltitude: Math.max(s.maxAltitude, currentAltitude),
+              }));
+              return;
+            }
 
             // Calculate elevation change
             const lastAltitude = lastPosition.coords.altitude || 0;
@@ -152,8 +168,8 @@ const TrackActivity = () => {
               };
             });
 
-            // Save trackpoint to database
-            if (activityId) {
+            // Save trackpoint to database only for real movement
+            if (activityId && distanceMeters >= 10) {
               await supabase.from("trackpoints").insert({
                 activity_id: activityId,
                 recorded_at: new Date().toISOString(),
@@ -163,17 +179,19 @@ const TrackActivity = () => {
                 speed_mps: calculatedSpeedMps,
               });
             }
+            
+            // Update last position only after significant movement
+            setLastPosition(position);
           } else {
-            // First position - initialize altitude values
+            // First position - initialize altitude values and set as reference
             setStats((s) => ({
               ...s,
               altitude: currentAltitude,
               minAltitude: currentAltitude,
               maxAltitude: currentAltitude,
             }));
+            setLastPosition(position);
           }
-
-          setLastPosition(position);
         },
         (error) => {
           if (error.code === error.PERMISSION_DENIED) {
