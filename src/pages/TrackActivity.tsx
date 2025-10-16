@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import StatCard from "@/components/StatCard";
+import ActivityMap from "@/components/ActivityMap";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -43,6 +44,8 @@ const TrackActivity = () => {
   });
 
   const [lastPosition, setLastPosition] = useState<GeolocationPosition | null>(null);
+  const [currentPosition, setCurrentPosition] = useState<[number, number] | null>(null);
+  const [trackPoints, setTrackPoints] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const [activityId, setActivityId] = useState<string | null>(null);
   const [watchId, setWatchId] = useState<number | null>(null);
   const [totalSpeeds, setTotalSpeeds] = useState<number[]>([]);
@@ -189,7 +192,13 @@ const TrackActivity = () => {
                 altitude_m: currentAltitude,
                 speed_mps: fusedSpeedMps,
               });
+              
+              // Add to track points for map visualization
+              setTrackPoints(prev => [...prev, { latitude, longitude }]);
             }
+            
+            // Update current position for map center
+            setCurrentPosition([longitude, latitude]);
             
             // Update last position only after significant movement
             setLastPosition(position);
@@ -202,6 +211,8 @@ const TrackActivity = () => {
               minAltitude: currentAltitude,
               maxAltitude: currentAltitude,
             }));
+            setCurrentPosition([longitude, latitude]);
+            setTrackPoints([{ latitude, longitude }]);
             setLastPosition(position);
           }
         },
@@ -385,12 +396,22 @@ const TrackActivity = () => {
           </div>
 
           <Card className="overflow-hidden">
-            <div className="h-64 bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 flex items-center justify-center">
-              <div className="text-center space-y-2">
-                <MapPin className="w-12 h-12 mx-auto text-primary" />
-                <p className="text-muted-foreground">Map view will display here</p>
-                <p className="text-sm text-muted-foreground">GPS tracking active</p>
-              </div>
+            <div className="h-96">
+              {currentPosition ? (
+                <ActivityMap 
+                  center={currentPosition}
+                  trackPoints={trackPoints}
+                  className="rounded-lg"
+                />
+              ) : (
+                <div className="h-full bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 flex items-center justify-center">
+                  <div className="text-center space-y-2">
+                    <MapPin className="w-12 h-12 mx-auto text-primary" />
+                    <p className="text-muted-foreground">Waiting for GPS signal...</p>
+                    <p className="text-sm text-muted-foreground">Start tracking to see your route</p>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
 
