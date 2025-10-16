@@ -54,7 +54,7 @@ const Index = () => {
             Your all-in-one multi-sport activity tracker for skiing, biking, off-roading, and beyond
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button variant="hero" size="xl" onClick={() => navigate("/select-sport")}>
+            <Button variant="hero" size="xl" onClick={() => navigate("/track")}>
               Start Tracking
             </Button>
             <Button variant="outline" size="xl" onClick={() => navigate("/activities")}>
@@ -103,7 +103,7 @@ const Index = () => {
               variant="outline"
               size="xl"
               className="bg-card text-card-foreground hover:bg-card/90 border-2"
-              onClick={() => navigate("/auth")}
+              onClick={() => navigate("/track")}
             >
               Get Started Free
             </Button>

@@ -32,7 +32,7 @@ const Navbar = () => {
           <Link to="/friends" className="text-sm font-medium hover:text-primary transition-smooth">
             Friends
           </Link>
-          <Link to="/select-sport" className="text-sm font-medium hover:text-primary transition-smooth">
+          <Link to="/track" className="text-sm font-medium hover:text-primary transition-smooth">
             Track
           </Link>
         </div>
