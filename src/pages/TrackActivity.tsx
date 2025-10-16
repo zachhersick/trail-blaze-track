@@ -97,11 +97,7 @@ const TrackActivity = () => {
         async (position) => {
           const { latitude, longitude, altitude, accuracy } = position.coords;
           
-          // Strict accuracy filtering - only accept GPS readings within 20 meters
-          if (accuracy > 20) {
-            console.log(`Ignoring low-accuracy position: ${accuracy}m`);
-            return;
-          }
+          // Do not hard-drop low-accuracy fixes; use movement thresholds to filter metrics
 
           const currentAltitude = altitude || 0;
 
@@ -125,6 +121,8 @@ const TrackActivity = () => {
             const movementThreshold = Math.max(15, (prevAcc || 0) + (currAcc || 0));
 
             if (timeDiffSeconds < 3 || distanceMeters < movementThreshold) {
+              // Always update map center so preview shows even if we ignore metrics
+              setCurrentPosition([longitude, latitude]);
               // Treat as stationary: only update altitude/extremes and set speed to 0
               setStats((s) => ({
                 ...s,
@@ -234,8 +232,8 @@ const TrackActivity = () => {
         },
         {
           enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 30000,
+          maximumAge: 5000,
+          timeout: 60000,
         }
       );
 
@@ -303,6 +301,21 @@ const TrackActivity = () => {
     setIsTracking(true);
     setIsPaused(false);
     setStartTime(new Date());
+
+    // Bootstrap map preview with a quick last-known location fetch
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setCurrentPosition([longitude, latitude]);
+        },
+        () => {
+          // ignore bootstrap errors; watchPosition will handle errors
+        },
+        { enableHighAccuracy: false, maximumAge: 600000, timeout: 10000 }
+      );
+    }
+
     toast({
       title: "Tracking Started",
       description: "Using GPS to track your activity...",
