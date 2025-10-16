@@ -113,30 +113,41 @@ const TrackActivity = () => {
 
             // Calculate time difference
             const timeDiffSeconds = (position.timestamp - lastPosition.timestamp) / 1000;
-            
-            // Require minimum 10 meters movement AND 2 seconds elapsed to register as real movement
-            if (distanceMeters < 10 || timeDiffSeconds < 2) {
-              // Update only altitude if position hasn't changed significantly
+
+            // Conservative movement detection:
+            // - require at least 3s between readings
+            // - require distance to exceed combined accuracy radii or at least 15m
+            const prevAcc = lastPosition.coords.accuracy ?? Infinity;
+            const currAcc = accuracy ?? Infinity;
+            const movementThreshold = Math.max(15, (prevAcc || 0) + (currAcc || 0));
+
+            if (timeDiffSeconds < 3 || distanceMeters < movementThreshold) {
+              // Treat as stationary: only update altitude/extremes and set speed to 0
               setStats((s) => ({
                 ...s,
                 altitude: currentAltitude,
                 minAltitude: Math.min(s.minAltitude || currentAltitude, currentAltitude),
                 maxAltitude: Math.max(s.maxAltitude, currentAltitude),
-                currentSpeed: 0, // No movement detected
+                currentSpeed: 0,
               }));
               return;
             }
 
             const distanceKm = distanceMeters / 1000;
-            
+
             // Calculate speed from position change and time elapsed
             const calculatedSpeedMps = distanceMeters / timeDiffSeconds;
-            const calculatedSpeedKmh = calculatedSpeedMps * 3.6;
-            
-            // Filter out unrealistic speeds (likely GPS errors)
-            // Minimum 1 km/h to register as movement, max 200 km/h to filter errors
-            if (calculatedSpeedKmh < 1 || calculatedSpeedKmh > 200) {
-              console.log(`Ignoring unrealistic speed: ${calculatedSpeedKmh.toFixed(1)} km/h`);
+            const gpsSpeedMps = typeof position.coords.speed === 'number' && !Number.isNaN(position.coords.speed)
+              ? position.coords.speed
+              : undefined;
+
+            // Fuse speeds conservatively: take the lower of GPS-reported and calculated when both present
+            const fusedSpeedMps = gpsSpeedMps !== undefined ? Math.min(calculatedSpeedMps, gpsSpeedMps) : calculatedSpeedMps;
+            const fusedSpeedKmh = fusedSpeedMps * 3.6;
+
+            // Filter out unrealistic or too-small speeds (likely GPS jitter)
+            if (fusedSpeedKmh < 1.5 || fusedSpeedKmh > 150) {
+              console.log(`Ignoring noisy speed: ${fusedSpeedKmh.toFixed(1)} km/h`);
               setStats((s) => ({
                 ...s,
                 currentSpeed: 0,
@@ -152,16 +163,16 @@ const TrackActivity = () => {
             const elevationChange = currentAltitude - lastAltitude;
 
             setStats((s) => {
-              const newSpeeds = [...totalSpeeds, calculatedSpeedKmh];
+              const newSpeeds = [...totalSpeeds, fusedSpeedKmh];
               setTotalSpeeds(newSpeeds);
               const avgSpeed = newSpeeds.reduce((a, b) => a + b, 0) / newSpeeds.length;
 
               return {
-                currentSpeed: calculatedSpeedKmh,
+                currentSpeed: fusedSpeedKmh,
                 avgSpeed,
                 distance: s.distance + distanceKm,
                 elevation: elevationChange > 0 ? s.elevation + elevationChange : s.elevation,
-                maxSpeed: Math.max(s.maxSpeed, calculatedSpeedKmh),
+                maxSpeed: Math.max(s.maxSpeed, fusedSpeedKmh),
                 altitude: currentAltitude,
                 minAltitude: s.minAltitude === 0 ? currentAltitude : Math.min(s.minAltitude, currentAltitude),
                 maxAltitude: Math.max(s.maxAltitude, currentAltitude),
@@ -169,19 +180,20 @@ const TrackActivity = () => {
             });
 
             // Save trackpoint to database only for real movement
-            if (activityId && distanceMeters >= 10) {
+            if (activityId && distanceMeters >= movementThreshold) {
               await supabase.from("trackpoints").insert({
                 activity_id: activityId,
                 recorded_at: new Date().toISOString(),
                 latitude,
                 longitude,
                 altitude_m: currentAltitude,
-                speed_mps: calculatedSpeedMps,
+                speed_mps: fusedSpeedMps,
               });
             }
             
             // Update last position only after significant movement
             setLastPosition(position);
+
           } else {
             // First position - initialize altitude values and set as reference
             setStats((s) => ({
