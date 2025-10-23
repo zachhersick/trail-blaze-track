@@ -368,6 +368,16 @@ const TrackActivity = () => {
       return;
     }
 
+    // Check for new achievements
+    try {
+      await supabase.rpc('check_achievements', {
+        p_user_id: user?.id,
+        p_activity_id: activityId,
+      });
+    } catch (error) {
+      console.error('Error checking achievements:', error);
+    }
+
     setIsTracking(false);
     setIsPaused(false);
     toast({

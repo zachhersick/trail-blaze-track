@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          category: string
+          created_at: string
+          criteria: Json
+          description: string
+          icon: string
+          id: string
+          name: string
+          points: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          criteria: Json
+          description: string
+          icon: string
+          id?: string
+          name: string
+          points?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          criteria?: Json
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          points?: number
+        }
+        Relationships: []
+      }
       activities: {
         Row: {
           average_speed_mps: number
@@ -113,6 +146,44 @@ export type Database = {
           },
         ]
       }
+      live_sessions: {
+        Row: {
+          activity_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          is_active: boolean
+          share_code: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean
+          share_code: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean
+          share_code?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_sessions_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -185,12 +256,54 @@ export type Database = {
           },
         ]
       }
+      user_achievements: {
+        Row: {
+          achievement_id: string
+          activity_id: string | null
+          id: string
+          unlocked_at: string
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          activity_id?: string | null
+          id?: string
+          unlocked_at?: string
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          activity_id?: string | null
+          id?: string
+          unlocked_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_achievements_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_achievements: {
+        Args: { p_activity_id: string; p_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       sport_type: "ski" | "bike" | "offroad" | "hike"

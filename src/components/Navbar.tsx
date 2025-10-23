@@ -26,14 +26,20 @@ const Navbar = () => {
         </Link>
 
         <div className="hidden md:flex items-center gap-6">
+          <Link to="/track" className="text-sm font-medium hover:text-primary transition-smooth">
+            Track
+          </Link>
           <Link to="/activities" className="text-sm font-medium hover:text-primary transition-smooth">
             Activities
           </Link>
+          <Link to="/leaderboard" className="text-sm font-medium hover:text-primary transition-smooth">
+            Leaderboard
+          </Link>
+          <Link to="/achievements" className="text-sm font-medium hover:text-primary transition-smooth">
+            Achievements
+          </Link>
           <Link to="/friends" className="text-sm font-medium hover:text-primary transition-smooth">
             Friends
-          </Link>
-          <Link to="/track" className="text-sm font-medium hover:text-primary transition-smooth">
-            Track
           </Link>
         </div>
 

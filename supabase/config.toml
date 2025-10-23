@@ -1,1 +1,7 @@
 project_id = "ehxgprnetufvtuwnckeo"
+
+[functions.ai-route-recommender]
+verify_jwt = true
+
+[functions.ai-performance-insights]
+verify_jwt = true

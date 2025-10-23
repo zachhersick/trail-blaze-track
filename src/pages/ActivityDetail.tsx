@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import StatCard from "@/components/StatCard";
 import ActivityMap from "@/components/ActivityMap";
+import AIInsights from "@/components/AIInsights";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -204,6 +205,8 @@ const ActivityDetail = () => {
               unit="m"
             />
           </div>
+
+          <AIInsights activityId={activity.id} />
         </div>
       </main>
     </div>

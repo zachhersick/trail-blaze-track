@@ -12,6 +12,9 @@ import ActivityDetail from "./pages/ActivityDetail";
 import Profile from "./pages/Profile";
 import Friends from "./pages/Friends";
 import FriendProfile from "./pages/FriendProfile";
+import Achievements from "./pages/Achievements";
+import Leaderboard from "./pages/Leaderboard";
+import LiveTracking from "./pages/LiveTracking";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -33,6 +36,9 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/friends" element={<Friends />} />
             <Route path="/friend/:id" element={<FriendProfile />} />
+            <Route path="/achievements" element={<Achievements />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/live" element={<LiveTracking />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/about" element={<Index />} />
             <Route path="*" element={<NotFound />} />
