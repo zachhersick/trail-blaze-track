@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import StatCard from "@/components/StatCard";
+import ActivityMap from "@/components/ActivityMap";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +37,7 @@ const ActivityDetail = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [activity, setActivity] = useState<Activity | null>(null);
+  const [trackpoints, setTrackpoints] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -59,6 +61,17 @@ const ActivityDetail = () => {
 
     if (data) {
       setActivity(data);
+      
+      // Load trackpoints for map visualization
+      const { data: points } = await supabase
+        .from("trackpoints")
+        .select("latitude, longitude")
+        .eq("activity_id", id)
+        .order("recorded_at", { ascending: true });
+      
+      if (points) {
+        setTrackpoints(points);
+      }
     }
     setLoading(false);
   };
@@ -129,12 +142,21 @@ const ActivityDetail = () => {
           </div>
 
           <Card className="overflow-hidden">
-            <div className="h-64 bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 flex items-center justify-center">
-              <div className="text-center space-y-2">
-                <MapPin className="w-12 h-12 mx-auto text-primary" />
-                <p className="text-muted-foreground">Route map</p>
-                <p className="text-sm text-muted-foreground">GPS track visualization</p>
-              </div>
+            <div className="h-96">
+              {trackpoints.length > 0 ? (
+                <ActivityMap
+                  center={[trackpoints[0].longitude, trackpoints[0].latitude]}
+                  trackPoints={trackpoints}
+                  className="rounded-lg"
+                />
+              ) : (
+                <div className="h-full bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 flex items-center justify-center">
+                  <div className="text-center space-y-2">
+                    <MapPin className="w-12 h-12 mx-auto text-primary" />
+                    <p className="text-muted-foreground">No GPS data available</p>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
 
