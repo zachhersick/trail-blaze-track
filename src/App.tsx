@@ -25,12 +25,12 @@ const queryClient = new QueryClient();
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <OfflineSync />
-          <BrowserRouter>
+      <BrowserRouter>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <OfflineSync />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/track" element={<SelectSport />} />
@@ -47,9 +47,9 @@ const App = () => (
               <Route path="/about" element={<Index />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
+          </TooltipProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   </ErrorBoundary>
 );
