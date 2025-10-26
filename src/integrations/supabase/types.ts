@@ -304,6 +304,28 @@ export type Database = {
         Args: { p_activity_id: string; p_user_id: string }
         Returns: undefined
       }
+      get_live_session_by_code: {
+        Args: { p_share_code: string }
+        Returns: {
+          activity_id: string
+          created_at: string
+          ended_at: string
+          id: string
+          is_active: boolean
+          share_code: string
+          user_id: string
+        }[]
+      }
+      get_live_trackpoints: {
+        Args: { p_share_code: string }
+        Returns: {
+          altitude_m: number
+          latitude: number
+          longitude: number
+          recorded_at: string
+          speed_mps: number
+        }[]
+      }
     }
     Enums: {
       sport_type: "ski" | "bike" | "offroad" | "hike"

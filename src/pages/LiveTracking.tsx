@@ -77,15 +77,11 @@ const LiveTracking = () => {
   const loadLiveSession = async () => {
     if (!shareCode) return;
 
-    // Load session
+    // Load session using secure RPC function
     const { data: sessionData, error: sessionError } = await supabase
-      .from("live_sessions")
-      .select("*")
-      .eq("share_code", shareCode)
-      .eq("is_active", true)
-      .single();
+      .rpc("get_live_session_by_code", { p_share_code: shareCode });
 
-    if (sessionError || !sessionData) {
+    if (sessionError || !sessionData || sessionData.length === 0) {
       toast({
         title: "Session Not Found",
         description: "This live tracking session is not available",
@@ -95,25 +91,23 @@ const LiveTracking = () => {
       return;
     }
 
-    setSession(sessionData);
+    const session = sessionData[0];
+    setSession(session);
 
     // Load activity details
     const { data: activityData } = await supabase
       .from("activities")
       .select("*")
-      .eq("id", sessionData.activity_id)
+      .eq("id", session.activity_id)
       .single();
 
     if (activityData) {
       setActivity(activityData);
     }
 
-    // Load existing trackpoints
+    // Load existing trackpoints using secure RPC function
     const { data: pointsData } = await supabase
-      .from("trackpoints")
-      .select("latitude, longitude, recorded_at, speed_mps, altitude_m")
-      .eq("activity_id", sessionData.activity_id)
-      .order("recorded_at", { ascending: true });
+      .rpc("get_live_trackpoints", { p_share_code: shareCode });
 
     if (pointsData && pointsData.length > 0) {
       setTrackpoints(pointsData);
