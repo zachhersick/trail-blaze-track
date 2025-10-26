@@ -16,6 +16,9 @@ import {
   Mountain as MountainIcon,
   TrendingUp,
   MapPin,
+  Share2,
+  Copy,
+  CheckCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,6 +53,8 @@ const TrackActivity = () => {
   const [watchId, setWatchId] = useState<number | null>(null);
   const [totalSpeeds, setTotalSpeeds] = useState<number[]>([]);
   const [locationPermission, setLocationPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
+  const [liveSessionCode, setLiveSessionCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -302,6 +307,21 @@ const TrackActivity = () => {
     setIsPaused(false);
     setStartTime(new Date());
 
+    // Create live session for sharing
+    const shareCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const { error: sessionError } = await supabase
+      .from("live_sessions")
+      .insert({
+        user_id: user.id,
+        activity_id: activity.id,
+        share_code: shareCode,
+        is_active: true,
+      });
+
+    if (!sessionError) {
+      setLiveSessionCode(shareCode);
+    }
+
     // Bootstrap map preview with a quick last-known location fetch
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -368,6 +388,14 @@ const TrackActivity = () => {
       return;
     }
 
+    // End live session
+    if (liveSessionCode) {
+      await supabase
+        .from("live_sessions")
+        .update({ is_active: false, ended_at: new Date().toISOString() })
+        .eq("share_code", liveSessionCode);
+    }
+
     // Check for new achievements
     try {
       await supabase.rpc('check_achievements', {
@@ -380,6 +408,7 @@ const TrackActivity = () => {
 
     setIsTracking(false);
     setIsPaused(false);
+    setLiveSessionCode(null);
     toast({
       title: "Activity Saved",
       description: "Your GPS-tracked session has been recorded!",
@@ -403,6 +432,18 @@ const TrackActivity = () => {
       hike: "Hiking",
     };
     return sportNames[sport || ""] || "Activity";
+  };
+
+  const handleCopyLiveLink = () => {
+    if (!liveSessionCode) return;
+    const url = `${window.location.origin}/live?code=${liveSessionCode}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    toast({
+      title: "Link Copied",
+      description: "Share this link to let others follow your activity live",
+    });
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -486,27 +527,53 @@ const TrackActivity = () => {
             />
           </div>
 
-          <div className="flex gap-4 justify-center">
-            {!isTracking ? (
-              <Button variant="hero" size="xl" onClick={handleStart}>
-                <Play className="w-5 h-5" />
-                Start Tracking
-              </Button>
-            ) : (
-              <>
-                <Button
-                  variant={isPaused ? "default" : "secondary"}
-                  size="xl"
-                  onClick={handlePause}
-                >
-                  {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-                  {isPaused ? "Resume" : "Pause"}
+          <div className="flex flex-col gap-4">
+            <div className="flex gap-4 justify-center">
+              {!isTracking ? (
+                <Button variant="hero" size="xl" onClick={handleStart}>
+                  <Play className="w-5 h-5" />
+                  Start Tracking
                 </Button>
-                <Button variant="destructive" size="xl" onClick={handleStop}>
-                  <Square className="w-5 h-5" />
-                  Stop & Save
-                </Button>
-              </>
+              ) : (
+                <>
+                  <Button
+                    variant={isPaused ? "default" : "secondary"}
+                    size="xl"
+                    onClick={handlePause}
+                  >
+                    {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+                    {isPaused ? "Resume" : "Pause"}
+                  </Button>
+                  <Button variant="destructive" size="xl" onClick={handleStop}>
+                    <Square className="w-5 h-5" />
+                    Stop & Save
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {isTracking && liveSessionCode && (
+              <Card className="p-4 bg-gradient-to-r from-primary/10 to-secondary/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                    <span className="text-sm font-medium">Live Tracking Active</span>
+                  </div>
+                  <Button onClick={handleCopyLiveLink} variant="outline" size="sm">
+                    {copied ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-4 h-4 mr-2" />
+                        Share Live Link
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </Card>
             )}
           </div>
         </div>

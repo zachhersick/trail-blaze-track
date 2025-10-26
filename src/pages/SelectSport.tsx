@@ -1,13 +1,15 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import SportCard from "@/components/SportCard";
+import AIRouteRecommender from "@/components/AIRouteRecommender";
 import { Bike, Mountain, Truck, Footprints } from "lucide-react";
 
 const SelectSport = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const [selectedSport, setSelectedSport] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -67,10 +69,17 @@ const SelectSport = () => {
                 name={sport.name}
                 description={sport.description}
                 color={sport.color}
-                onClick={() => navigate(sport.route)}
+                onClick={() => {
+                  setSelectedSport(sport.route.split('/').pop() || null);
+                  navigate(sport.route);
+                }}
               />
             ))}
           </div>
+
+          {selectedSport && (
+            <AIRouteRecommender sportType={selectedSport} />
+          )}
         </div>
       </main>
     </div>
