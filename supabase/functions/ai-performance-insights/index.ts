@@ -1,10 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Validation schema
+const requestSchema = z.object({
+  activityId: z.string().uuid("Invalid activity ID format"),
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,7 +18,12 @@ serve(async (req) => {
   }
 
   try {
-    const { activityId } = await req.json();
+    const body = await req.json();
+    
+    // Validate and sanitize input
+    const validated = requestSchema.parse(body);
+    const { activityId } = validated;
+    
     console.log('Performance insights request for activity:', activityId);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -132,6 +143,14 @@ Provide insights on performance, strengths, and specific improvement tips.`;
 
   } catch (error) {
     console.error('Error:', error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: `Validation error: ${error.errors[0].message}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

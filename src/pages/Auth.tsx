@@ -8,6 +8,19 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mountain } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+// Validation schemas
+const loginSchema = z.object({
+  email: z.string().trim().email("Invalid email address").max(255, "Email too long"),
+  password: z.string().min(6, "Password must be at least 6 characters").max(128, "Password too long"),
+});
+
+const signupSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name too long"),
+  email: z.string().trim().email("Invalid email address").max(255, "Email too long"),
+  password: z.string().min(6, "Password must be at least 6 characters").max(128, "Password too long"),
+});
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -32,22 +45,45 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    const { error } = await signIn(loginEmail, loginPassword);
-    
-    setIsLoading(false);
-    
-    if (error) {
-      toast({
-        title: "Error signing in",
-        description: error.message,
-        variant: "destructive",
+    try {
+      // Validate input
+      const validated = loginSchema.parse({
+        email: loginEmail,
+        password: loginPassword,
       });
-    } else {
-      toast({
-        title: "Welcome back!",
-        description: "Redirecting to dashboard...",
-      });
-      navigate("/track");
+      
+      const { error } = await signIn(validated.email, validated.password);
+      
+      setIsLoading(false);
+      
+      if (error) {
+        toast({
+          title: "Error signing in",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Welcome back!",
+          description: "Redirecting to dashboard...",
+        });
+        navigate("/track");
+      }
+    } catch (error) {
+      setIsLoading(false);
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -55,22 +91,46 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    const { error } = await signUp(signupEmail, signupPassword, signupName);
-    
-    setIsLoading(false);
-    
-    if (error) {
-      toast({
-        title: "Error creating account",
-        description: error.message,
-        variant: "destructive",
+    try {
+      // Validate input
+      const validated = signupSchema.parse({
+        name: signupName,
+        email: signupEmail,
+        password: signupPassword,
       });
-    } else {
-      toast({
-        title: "Account created!",
-        description: "Welcome to TrackSport!",
-      });
-      navigate("/track");
+      
+      const { error } = await signUp(validated.email, validated.password, validated.name);
+      
+      setIsLoading(false);
+      
+      if (error) {
+        toast({
+          title: "Error creating account",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Account created!",
+          description: "Welcome to TrackSport!",
+        });
+        navigate("/track");
+      }
+    } catch (error) {
+      setIsLoading(false);
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred",
+          variant: "destructive",
+        });
+      }
     }
   };
 

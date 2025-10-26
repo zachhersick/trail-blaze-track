@@ -4,6 +4,11 @@ import { Card } from "@/components/ui/card";
 import { MapPin, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+// Validation schema matching edge function
+const validSportTypes = ['ski', 'bike', 'offroad', 'hike'] as const;
+const sportTypeSchema = z.enum(validSportTypes);
 
 interface AIRouteRecommenderProps {
   sportType: string;
@@ -17,10 +22,17 @@ const AIRouteRecommender = ({ sportType }: AIRouteRecommenderProps) => {
   const generateRecommendation = async () => {
     setLoading(true);
     try {
+      // Validate sport type before sending
+      const validatedSportType = sportTypeSchema.parse(sportType);
+      
       const { data, error } = await supabase.functions.invoke(
         "ai-route-recommender",
         {
-          body: { sportType },
+          body: { 
+            sportType: validatedSportType,
+            location: "your area", // Default location
+            skillLevel: "intermediate" // Default skill level
+          },
         }
       );
 
@@ -48,11 +60,20 @@ const AIRouteRecommender = ({ sportType }: AIRouteRecommenderProps) => {
       setRecommendation(data.recommendation);
     } catch (error) {
       console.error("Error generating recommendation:", error);
-      toast({
-        title: "Error",
-        description: "Failed to generate route recommendation. Please try again.",
-        variant: "destructive",
-      });
+      
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Invalid Sport Type",
+          description: "The selected sport type is not supported.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to generate route recommendation. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }

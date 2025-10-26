@@ -1,10 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Validation schema
+const requestSchema = z.object({
+  sportType: z.enum(['ski', 'bike', 'offroad', 'hike'], {
+    errorMap: () => ({ message: "Sport type must be one of: ski, bike, offroad, hike" })
+  }),
+  location: z.string().trim().min(1, "Location is required").max(200, "Location too long"),
+  skillLevel: z.enum(['beginner', 'intermediate', 'advanced'], {
+    errorMap: () => ({ message: "Skill level must be one of: beginner, intermediate, advanced" })
+  }).optional(),
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,7 +24,12 @@ serve(async (req) => {
   }
 
   try {
-    const { sportType, location, skillLevel } = await req.json();
+    const body = await req.json();
+    
+    // Validate and sanitize input
+    const validated = requestSchema.parse(body);
+    const { sportType, location, skillLevel } = validated;
+    
     console.log('Route recommendation request:', { sportType, location, skillLevel });
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -101,6 +118,14 @@ Keep recommendations practical and location-specific. ${userContext}`;
 
   } catch (error) {
     console.error('Error:', error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: `Validation error: ${error.errors[0].message}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
