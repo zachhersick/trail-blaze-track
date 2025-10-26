@@ -10,4 +10,4 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-# https://trail-blaze-track.lovable.app/track
+# https://trail-blaze-track.lovable.app
